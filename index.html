@@ -65,7 +65,7 @@ th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);vertical-ali
 
 <div class="cd" style="margin-bottom:12px">
 <b>Roster data:</b> <span id="load">Connecting to ESPN…</span>
-<div class="mu">Roster names update from ESPN. Salaries, player ratings, and draft picks are placeholders; trade legality is not an official NBA/CBA determination.</div>
+<div class="mu">Roster names and contract salaries update from ESPN. Player ratings and draft picks are placeholders; trade legality is not an official NBA/CBA determination.</div>
 </div>
 
 <div class="cd ban">
@@ -127,8 +127,35 @@ const Y4="2027 1st (placeholder),2028 1st (placeholder),2029 1st (placeholder),2
 const T={};
 let SORTED=[];
 
-function estimateSalary(years){
-return years>=10?8:years>=6?5:years>=3?3:1.5;
+function fallbackSalary(years){
+if(years===0)return 1.1;
+if(years===1)return 1.7;
+if(years===2)return 2.8;
+if(years===3)return 4.2;
+if(years===4)return 6.0;
+if(years===5)return 8.5;
+if(years<=7)return 11.0;
+if(years<=9)return 14.5;
+return 18.0;
+}
+
+function salaryFromAthlete(a,payload){
+const contractSalary=Number(a.contract?.salary);
+if(Number.isFinite(contractSalary)&&contractSalary>0)return contractSalary/1000000;
+
+const seasonYear=Number(payload?.season?.year);
+const matching=Array.isArray(a.contracts)?a.contracts.find(c=>Number(c.season?.year)===seasonYear):null;
+const listedSalary=Number(matching?.salary);
+if(Number.isFinite(listedSalary)&&listedSalary>0)return listedSalary/1000000;
+
+const latest=Array.isArray(a.contracts)?a.contracts
+.map(c=>({year:Number(c.season?.year)||0,salary:Number(c.salary)||0}))
+.filter(c=>c.salary>0)
+.sort((a,b)=>b.year-a.year)[0]:null;
+if(latest)return latest.salary/1000000;
+
+const years=Number(a.experience?.years??a.experience?.displayValue??0)||0;
+return fallbackSalary(years);
 }
 function estimateOverall(years){
 return years>=10?80:years>=6?78:years>=3?76:74;
@@ -155,7 +182,7 @@ let role="Wing";
 if(pos.includes("PG")||pos==="G")role="Playmaker";
 else if(pos==="C")role="RimProtector";
 else if(pos==="PF")role="Rebounder";
-return{name,pos,sal:estimateSalary(years),ovr:estimateOverall(years),role};
+return{name,pos,sal:salaryFromAthlete(a,payload),ovr:estimateOverall(years),role};
 });
 T[code]={name:TEAM_NAMES[code],picks:Y4.split(","),roster};
 }));
@@ -166,7 +193,7 @@ status.textContent=`Could not load all 30 rosters (${SORTED.length}/30 loaded). 
 $("grid").innerHTML='<div class="cd">Roster data could not be loaded from ESPN. Refresh the page or try again later.</div>';
 return;
 }
-status.textContent="All 30 team rosters loaded from ESPN. Player salaries and ratings below are estimates, not official contract or scouting data.";
+status.textContent="All 30 team rosters loaded from ESPN. Contract salaries are used when ESPN provides them; missing salaries use realistic experience-based estimates.";
 reset();
 }
 
