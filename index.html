@@ -128,34 +128,34 @@ const T={};
 let SORTED=[];
 
 function fallbackSalary(years){
-if(years===0)return 1.1;
-if(years===1)return 1.7;
-if(years===2)return 2.8;
-if(years===3)return 4.2;
-if(years===4)return 6.0;
-if(years===5)return 8.5;
-if(years<=7)return 11.0;
-if(years<=9)return 14.5;
-return 18.0;
+if(years===0)return 1.127;
+if(years===1)return 1.955;
+if(years===2)return 2.296;
+if(years===3)return 3.005;
+if(years===4)return 3.303;
+if(years===5)return 3.759;
+if(years<=7)return 4.300;
+if(years<=9)return 5.700;
+return 6.300;
 }
 
 function salaryFromAthlete(a,payload){
 const contractSalary=Number(a.contract?.salary);
-if(Number.isFinite(contractSalary)&&contractSalary>0)return contractSalary/1000000;
+if(Number.isFinite(contractSalary)&&contractSalary>0)return{sal:contractSalary/1000000,estimated:false};
 
 const seasonYear=Number(payload?.season?.year);
 const matching=Array.isArray(a.contracts)?a.contracts.find(c=>Number(c.season?.year)===seasonYear):null;
 const listedSalary=Number(matching?.salary);
-if(Number.isFinite(listedSalary)&&listedSalary>0)return listedSalary/1000000;
+if(Number.isFinite(listedSalary)&&listedSalary>0)return{sal:listedSalary/1000000,estimated:false};
 
 const latest=Array.isArray(a.contracts)?a.contracts
 .map(c=>({year:Number(c.season?.year)||0,salary:Number(c.salary)||0}))
 .filter(c=>c.salary>0)
 .sort((a,b)=>b.year-a.year)[0]:null;
-if(latest)return latest.salary/1000000;
+if(latest)return{sal:latest.salary/1000000,estimated:true};
 
 const years=Number(a.experience?.years??a.experience?.displayValue??0)||0;
-return fallbackSalary(years);
+return{sal:fallbackSalary(years),estimated:true};
 }
 function estimateOverall(years){
 return years>=10?80:years>=6?78:years>=3?76:74;
@@ -182,7 +182,8 @@ let role="Wing";
 if(pos.includes("PG")||pos==="G")role="Playmaker";
 else if(pos==="C")role="RimProtector";
 else if(pos==="PF")role="Rebounder";
-return{name,pos,sal:salaryFromAthlete(a,payload),ovr:estimateOverall(years),role};
+const salary=salaryFromAthlete(a,payload);
+return{name,pos,sal:salary.sal,estimatedSalary:salary.estimated,ovr:estimateOverall(years),role};
 });
 T[code]={name:TEAM_NAMES[code],picks:Y4.split(","),roster};
 }));
@@ -193,7 +194,7 @@ status.textContent=`Could not load all 30 rosters (${SORTED.length}/30 loaded). 
 $("grid").innerHTML='<div class="cd">Roster data could not be loaded from ESPN. Refresh the page or try again later.</div>';
 return;
 }
-status.textContent="All 30 team rosters loaded from ESPN. Contract salaries are used when ESPN provides them; missing salaries use realistic experience-based estimates.";
+status.textContent="All 30 team rosters loaded from ESPN. Contract salaries come directly from ESPN; only genuinely missing salary data is marked (est.).";
 reset();
 }
 
@@ -312,13 +313,13 @@ const t=T[r.code];
 const opts=SORTED.map(c=>`<option value="${c}"${c===r.code?" selected":""}>${T[c].name}</option>`).join("");
 const ros=t.roster.map((p,k)=>{
 const o=outP[i].find(x=>x.k===k);
-return `<div class="pl${o?" on":""}" tabindex="0" onclick="togP(${i},${k})" onkeydown="if(event.key==='Enter')togP(${i},${k})"><span><b>${p.pos}</b> ${p.name} <i>${p.ovr}</i></span><span class="num">$${p.sal.toFixed(2)}M${o&&N>2?" "+dsel(i,"dstP",k,o.to):""}</span></div>`;
+return `<div class="pl${o?" on":""}" tabindex="0" onclick="togP(${i},${k})" onkeydown="if(event.key==='Enter')togP(${i},${k})"><span><b>${p.pos}</b> ${p.name} <i>${p.ovr}</i></span><span class="num">$${p.sal.toFixed(2)}M${p.estimatedSalary?" (est.)":""}${o&&N>2?" "+dsel(i,"dstP",k,o.to):""}</span></div>`;
 }).join("");
 const pks=t.picks.map((pk,k)=>{
 const o=outK[i].find(x=>x.k===k);
 return `<button class="pk${o?" on":""}" onclick="togK(${i},${k})">${pk}${o&&N>2?" "+dsel(i,"dstK",k,o.to):""}</button>`;
 }).join("");
-const inc=(r.inn.length||r.inPk.length)?`<div class="sm b-ok"><b>Incoming to ${r.code}</b><br>${r.inn.map(p=>`${p.name} (${p.pos}, ${p.ovr}) $${p.sal.toFixed(2)}M`).join("<br>")}${r.inn.length&&r.inPk.length?"<br>":""}${r.inPk.join(", ")}</div>`:"";
+const inc=(r.inn.length||r.inPk.length)?`<div class="sm b-ok"><b>Incoming to ${r.code}</b><br>${r.inn.map(p=>`${p.name} (${p.pos}, ${p.ovr}) $${p.sal.toFixed(2)}M${p.estimatedSalary?" (est.)":""}`).join("<br>")}${r.inn.length&&r.inPk.length?"<br>":""}${r.inPk.join(", ")}</div>`:"";
 return `<div class="cd card"><select onchange="setTeam(${i},this.value)" aria-label="Team ${i+1}">${opts}</select>
 <div class="sm num ${r.legal?"b-ok":"b-bad"}">Payroll $${f1(r.base)}M to $${f1(r.post)}M<br>${r.reason}</div>${inc}
 <div class="mu">Roster (${t.roster.length}): click to trade. Chemistry after trade: ${chem(post(r))}/100</div><div class="ros">${ros}</div>
